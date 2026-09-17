@@ -1,0 +1,14 @@
+{
+  "sourceDirectory": "src/main/java",
+  "outputDirectory": "dist",
+  "publicDirectory": "public",
+  "entryHtml": "index.html",
+  "tailwindInput": "styles/app.css",
+  "cssModuleDirectories": ["styles", "src/main/java"],
+  "host": "127.0.0.1",
+  "port": 5173,
+  "basePath": "/",
+  "spaFallback": true,
+  "sourceMaps": true,
+  "minify": true
+}

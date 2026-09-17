@@ -1,0 +1,11 @@
+.git
+.javelin
+dist
+node_modules
+data
+work
+.private
+*.tgz
+.env
+.env.*
+.vercel

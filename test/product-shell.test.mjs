@@ -1,0 +1,26 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {JSDOM} from 'jsdom';
+test('product mounts inside Javelin shell and dialog restores focus on Escape',async()=>{
+ const dom=new JSDOM('<div id="app"><div id="product-root"></div></div>',{url:'http://localhost',runScripts:'outside-only'});
+ dom.window.fetch=async()=>({ok:true,json:async()=>({user:null,projects:[],backend:'supabase'})});
+ const source=readFileSync(new URL('../public/product-app.mjs',import.meta.url),'utf8').replace(/^import .*;\r?\n/gm,'');
+ await dom.window.eval(`(async()=>{const setupSearchSuggestions=()=>{},setupSortMenu=()=>{},sortMenu=()=>'';${source}})()`);
+ await new Promise(r=>setTimeout(r,20));
+ const d=dom.window.document, shell=d.querySelector('#product-root');
+ assert.ok(shell);assert.equal(d.querySelectorAll('header.site-header').length,1);
+ shell.querySelector('[data-action=account]').click();
+ assert.equal(d.activeElement.getAttribute('aria-label'),'閉じる');
+ assert.equal(shell.querySelector('main').inert,true);
+ assert.ok(shell.querySelector('[data-action=recover-password]'));
+ shell.querySelector('[data-action=auth-register]').click();
+ assert.equal(shell.querySelector('#auth-form').dataset.mode,'register');
+ assert.equal(shell.querySelector('[data-action=recover-password]'),null);
+ shell.querySelector('[data-action=auth-login]').click();
+ assert.ok(shell.querySelector('[data-action=recover-password]'));
+ d.activeElement.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+ assert.equal(shell.querySelector('[role=dialog]'),null);
+ assert.equal(d.activeElement.dataset.action,'account');
+ assert.equal(shell.querySelector('main').inert,false);dom.window.close();
+});

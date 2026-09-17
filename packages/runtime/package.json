@@ -1,0 +1,15 @@
+{
+  "name": "@javelin-ui/runtime",
+  "version": "0.8.0-alpha.1",
+  "description": "Browser runtime for Java-authored Javelin UI applications",
+  "type": "module",
+  "exports": "./dist/index.mjs",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": true,
+  "publishConfig": {
+    "access": "public"
+  }
+}

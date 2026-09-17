@@ -1,0 +1,28 @@
+{
+  "name": "@javelin-ui/cli",
+  "version": "0.8.0-alpha.1",
+  "description": "javac AST compiler, Tailwind build, and development server for Javelin UI",
+  "type": "module",
+  "bin": {
+    "javelin-ui": "./dist/bin/javelin-ui.mjs"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "chokidar": "^4.0.3",
+    "esbuild": "^0.25.0",
+    "postcss": "^8.5.23",
+    "postcss-selector-parser": "^7.1.0",
+    "source-map": "^0.7.6",
+    "tailwindcss": "^4.3.3"
+  }
+}

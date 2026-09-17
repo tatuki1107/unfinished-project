@@ -1,0 +1,47 @@
+{
+  "name": "javelin-ui",
+  "version": "0.8.0-alpha.1",
+  "private": true,
+  "workspaces": [
+    "packages/runtime",
+    "packages/cli",
+    "packages/create-app"
+  ],
+  "type": "module",
+  "description": "A React-like browser UI framework authored in Java.",
+  "scripts": {
+    "build": "node ./bin/javelin-ui.mjs build",
+    "dev": "npm run build && node ./server.mjs",
+    "serve": "node ./server.mjs",
+    "start": "node ./bin/javelin-ui.mjs start",
+    "check:java": "node ./bin/check-java.mjs",
+    "check:supabase": "node --env-file=.env.local scripts/check-supabase.mjs",
+    "serve:cloud": "node --env-file=.env.local cloud-server.mjs",
+    "build:vercel": "npm run build && node --env-file=.env.local scripts/build-vercel.mjs",
+    "packages:build": "node ./scripts/build-packages.mjs",
+    "packages:check": "npm run packages:build && npm pack --dry-run --workspace @javelin-ui/runtime && npm pack --dry-run --workspace @javelin-ui/cli && npm pack --dry-run --workspace create-javelin-ui",
+    "test": "node --test",
+    "test:fullstack": "node --test test/fullstack.test.mjs"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@tailwindcss/cli": "^4.3.3",
+    "chokidar": "^5.0.0",
+    "esbuild": "^0.28.1",
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^29.1.1",
+    "postcss": "^8.5.23",
+    "postcss-selector-parser": "^7.1.0",
+    "source-map": "^0.8.0",
+    "tailwindcss": "^4.3.3"
+  },
+  "dependencies": {
+    "@fontsource/m-plus-rounded-1c": "^5.3.0",
+    "@fontsource/noto-sans-jp": "^5.3.0",
+    "@phosphor-icons/core": "^2.1.1",
+    "@supabase/supabase-js": "^2.116.0"
+  }
+}
