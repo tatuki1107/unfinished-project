@@ -19,11 +19,7 @@ async function api(path, options={}) {
 async function boot() {
   const hash=new URLSearchParams(location.hash.slice(1));
   const recovery=hash.get('type')==='recovery';
-  if(hash.has('access_token')) {
-    const tokens={access_token:hash.get('access_token'),refresh_token:hash.get('refresh_token')};
-    history.replaceState(null,'',location.pathname+location.search);
-    await api('/api/auth/session',{method:'POST',body:JSON.stringify(tokens)});
-  }
+  if(hash.has('access_token')||hash.has('error')) {const fragment=location.hash;history.replaceState(null,'',location.pathname+location.search);location.replace('/auth-complete.html'+fragment);return;}
   const session = await api("/api/session"); state.user=session.user; state.backend=session.backend;
   await loadProjects();
   const params=new URLSearchParams(location.search);
@@ -34,7 +30,9 @@ async function boot() {
     }
   }
   render();
-  if(recovery&&state.user){state.modal='password';render();}
+  if((recovery||params.get('auth')==='recovery')&&state.user){state.modal='password';render();}
+  else if(params.get('auth')==='login'||params.get('auth')==='register'||params.get('auth')==='recovery'){state.modal=params.get('auth')==='register'?'register':'auth';render();}
+  if(params.has('auth')){params.delete('auth');history.replaceState(null,'',location.pathname+(params.size?'?'+params:''));}
   if(params.get('project')&&!state.modal) root.querySelector('.detail-panel')?.scrollIntoView({block:'start'});
 }
 
@@ -108,6 +106,9 @@ function main() {
   return `<main class="page">${intro()}${filters()}<div class="content-grid"><section class="feed" aria-labelledby="feed-title"><div class="section-heading"><div><h2 id="feed-title">新しく置かれた作品</h2><p>${state.projects.length}件</p></div><button class="text-link" data-action="refresh">更新する <img src="${icons("arrow-right")}" alt=""></button></div><div class="project-list">${state.projects.map(projectCard).join("")||`<div class="empty-state"><h3>作品がありません</h3><p>検索条件を変えるか、最初の作品を置いてみてください。</p></div>`}</div></section>${detail()}</div></main>`;
 }
 
+function confirmationModal() {
+ return `<div class="modal-backdrop"><section class="composer auth-modal"><div class="composer-head"><div><p class="kicker">CHECK YOUR INBOX</p><h2>確認メールを送信しました</h2></div><button class="close-button" aria-label="閉じる" data-action="close-modal"><img src="${icons('x')}" alt=""></button></div><p class="confirmation-copy">メール内のリンクを開くと登録が完了し、自動でログインします。まだ登録は完了していません。</p><form id="confirmation-form"><label>登録したメールアドレス<input name="email" type="email" required maxlength="180" autocomplete="email" value="${esc(state.pendingEmail)}"></label><p class="form-error form-notice" role="status" tabindex="-1">メール内のリンクを開いてください。届かない場合は迷惑メールフォルダをご確認ください。すでに登録済みの方はログインしてください。</p><button type="button" class="secondary-button" data-action="resend-confirmation">確認メールを再送</button></form><div class="auth-resend"><button class="primary-button" data-action="check-confirmation">確認が済んだので進む</button><button class="subtle-button" data-action="auth-login">ログイン画面へ</button></div></section></div>`;
+}
 function authModal(mode="login") {
   return `<div class="modal-backdrop"><section class="composer auth-modal" role="dialog" aria-modal="true" aria-label="ログイン"><div class="composer-head"><div><span class="modal-icon"><img src="${icons("users")}" alt=""></span><div><p class="kicker">MEMBER</p><h2>${mode==="register"?"アカウントを作る":"ログイン"}</h2></div></div><button class="close-button" aria-label="閉じる" data-action="close-modal"><img src="${icons("x")}" alt=""></button></div>
   <div class="auth-switch"><button data-action="auth-login" class="${mode==="login"?"active":""}">ログイン</button><button data-action="auth-register" class="${mode==="register"?"active":""}">新規登録</button></div>
@@ -176,6 +177,7 @@ root.addEventListener('keydown',event=>{
 function modal() {
   if(!state.modal) return "";
   if(state.modal==='password')return `<div class="modal-backdrop"><section class="composer auth-modal" role="dialog" aria-modal="true" aria-label="パスワードの変更"><div class="composer-head"><h2>パスワードの変更</h2><button class="close-button" aria-label="閉じる" data-action="close-modal">×</button></div><form id="password-form"><label>新しいパスワード<input name="password" type="password" required minlength="8" maxlength="128" autocomplete="new-password"></label><p class="form-error" role="alert" hidden></p><button class="primary-button">変更する</button></form></section></div>`;
+  if(state.modal==='confirmation')return confirmationModal();
   if(state.modal==="auth") return authModal(); if(state.modal==="register") return authModal("register"); if(state.modal==="account") return accountModal();
   if(state.modal==="new") return projectModal(false,false); if(state.modal==="branch") return projectModal(true,false); if(state.modal==="edit") return projectModal(false,true);
   if(state.modal==="profile") return profileModal(); if(state.modal==="report") return reportModal(); if(state.modal==="notifications") return notificationsModal();
@@ -196,12 +198,21 @@ function flash(message,error=false) {
 }
 function formError(form,message,notice=false) { let box=form?.querySelector('.form-error'); if(!box&&form){box=document.createElement('p');box.className='form-error';form.append(box);}if(!box){flash(message,!notice);return;} box.classList.toggle('form-notice',notice);box.setAttribute('role',notice?'status':'alert');box.hidden=false;box.textContent=message;box.tabIndex=-1;box.focus({preventScroll:true});box.scrollIntoView?.({block:'nearest'}); }
 const mailCooldowns=new Map();
+let confirmationChecking=false;
+async function checkConfirmation(silent=false){
+ if(state.modal!=='confirmation'||confirmationChecking)return;
+ confirmationChecking=true;
+ try {const session=await api('/api/session');if(!session.user||session.user.email?.toLowerCase()!==state.pendingEmail?.toLowerCase()){if(!silent)formError(root.querySelector('#confirmation-form'),'まだログインを確認できません。メール内のリンクを開いてください。別のブラウザで確認した場合は、こちらでもログインしてください。',true);return;}if(state.modal!=='confirmation')return;state.user=session.user;state.modal=null;await loadProjects();flash('ログインしました');}
+ catch(error){if(!silent)formError(root.querySelector('#confirmation-form'),error.message);}
+ finally{confirmationChecking=false;}
+}
+window.addEventListener('focus',()=>checkConfirmation(true));
 function mailCooldown(button,key){
  const update=()=>{const seconds=Math.ceil(((mailCooldowns.get(key)||0)-Date.now())/1000);button.disabled=seconds>0;button.textContent=seconds>0?`再送まで ${seconds} 秒`:button.dataset.idleLabel;return seconds;};
  if(update()>0){const timer=setInterval(()=>{if(!button.isConnected||update()<=0)clearInterval(timer);},1000);}
 }
 async function sendAuthMail(button,action){
- const form=root.querySelector('#auth-form'),field=form?.querySelector('[name=email]');if(!form||form.dataset.saving)return;
+ const form=root.querySelector('#auth-form, #confirmation-form'),field=form?.querySelector('[name=email]');if(!form||form.dataset.saving)return;
  if(!field.value.trim()||!field.checkValidity()){formError(form,'正しいメールアドレスを入力してから押してください。');return;}
  const email=field.value.trim(),key=`${action}:${email.toLowerCase()}`;
  button.dataset.idleLabel ||= button.textContent;
@@ -231,6 +242,7 @@ root.addEventListener("click",async event=>{
     if(button.dataset.projectFromModal){ state.modal=null; state.selectedId=button.dataset.projectFromModal; await loadDetail(); render(); return; }
     if(button.dataset.noticeProject){ state.modal=null; state.selectedId=button.dataset.noticeProject; await loadDetail(); render(); return; }
     const action=button.dataset.action; if(!action) return;
+    if(action==='check-confirmation'){await checkConfirmation();return;}
     if(action==='recover-password'||action==='resend-confirmation'){await sendAuthMail(button,action);return;}
     if(action==="focus-search"){ document.querySelector("#project-search")?.focus(); return; }
     if(action==="close-modal"){ state.modal=null; state.returnToBranch=false; render(); return; }
@@ -283,7 +295,7 @@ root.addEventListener("submit",async event=>{
       try {
         const d=Object.fromEntries(new FormData(form)),mode=form.dataset.mode;
         const result=await api(`/api/auth/${mode}`,{method:"POST",body:JSON.stringify(d)});
-        if(result.confirmationRequired){form.querySelector('[name=password]').value='';const resend=root.querySelector('[data-action=resend-confirmation]');if(resend){const key=`resend-confirmation:${d.email.trim().toLowerCase()}`;resend.dataset.idleLabel='確認メールを再送';mailCooldowns.set(key,Date.now()+60000);mailCooldown(resend,key);}formError(form,'確認メールをご確認ください。メール内のリンクを開くと登録が完了します。届かない場合は迷惑メールフォルダをご確認のうえ、下の「確認メールを再送」をお使いください。すでに登録済みの方はログインしてください。',true);return;}
+        if(result.confirmationRequired){form.querySelector('[name=password]').value='';state.pendingEmail=d.email.trim();state.modal='confirmation';render();const resend=root.querySelector('[data-action=resend-confirmation]'),key=`resend-confirmation:${d.email.trim().toLowerCase()}`;resend.dataset.idleLabel='確認メールを再送';mailCooldowns.set(key,Date.now()+60000);mailCooldown(resend,key);return;}
         state.user=result.user;state.modal=null;
         if(state.returnToBranch){await loadDetail();state.modal='branch';state.returnToBranch=false;render();}
         else{await loadProjects();flash(mode==="register"?"アカウントを作成しました":"ログインしました");}

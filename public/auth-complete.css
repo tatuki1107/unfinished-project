@@ -1,0 +1,13 @@
+:root { color-scheme:light; font-family:"Yu Gothic",Meiryo,sans-serif; color:#092650; background:#f8f6ef; }
+* { box-sizing:border-box; } body { margin:0; } .auth-page { width:min(100%,640px); margin:0 auto; padding:56px 24px; }
+.brand { display:block; margin-bottom:38px; } .brand img { width:230px; max-width:100%; height:auto; }
+.auth-card { background:#fffefa; padding:36px; border:1px solid #a9b8cb; border-top:4px solid #1878df; }
+.eyebrow { color:#1878df; font-size:11px; letter-spacing:.15em; margin:0 0 18px; }
+h1 { font-family:Georgia,"Yu Mincho",serif; font-size:28px; line-height:1.6; margin:0 0 18px; }
+#auth-message { line-height:1.9; font-size:15px; overflow-wrap:anywhere; } #auth-actions { margin-top:28px; }
+#auth-actions a { display:block; text-align:center; padding:14px 20px; margin:12px 0; text-decoration:none; font-size:14px; font-weight:bold; }
+.primary { background:#1878df; color:white; } .secondary { color:#092650; border:1px solid #a9b8cb; }
+.auth-note { border-top:1px solid #dce2e9; margin:28px 0 0; padding-top:18px; font-size:12px; line-height:1.8; color:#53667d; }
+.tagline { color:#53667d; font-size:13px; margin-top:26px; } a:focus-visible { outline:3px solid #1878df; outline-offset:4px; }
+.auth-card[data-status=error] { border-top-color:#ad2940; } .auth-card[data-status=success] { border-top-color:#399674; }
+[hidden] { display:none!important; } @media(max-width:480px) { .auth-page { padding:30px 18px; } .auth-card { padding:24px; } h1 { font-size:23px; } }

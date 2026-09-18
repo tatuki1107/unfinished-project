@@ -16,9 +16,9 @@ test('registration confirmation is a notice, keeps email and clears password wit
    f.querySelector('[name=email]').value='registration-test@example.com';f.querySelector('[name=password]').value='test-password';
    f.dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));
    await new Promise(r=>setTimeout(r,20));
-   const notice=f.querySelector('.form-notice');assert.ok(notice);assert.equal(notice.hidden,false);assert.equal(notice.getAttribute('role'),'status');
-   assert.match(notice.textContent,/メール内のリンク/);assert.equal(f.querySelector('[name=password]').value,'');assert.equal(f.querySelector('[name=email]').value,'registration-test@example.com');
-   assert.equal(f.querySelector('button').disabled,false);assert.equal(d.querySelector('.success-toast'),null);
+   const waiting=d.querySelector('#confirmation-form'),notice=waiting.querySelector('.form-notice');assert.ok(notice);assert.equal(notice.hidden,false);assert.equal(notice.getAttribute('role'),'status');
+   assert.match(notice.textContent,/メール内のリンク/);assert.equal(f.querySelector('[name=password]').value,'');assert.equal(waiting.querySelector('[name=email]').value,'registration-test@example.com');
+   assert.equal(d.querySelector('#auth-form'),null);assert.equal(waiting.querySelector('[name=password]'),null);assert.equal(waiting.querySelector('button').disabled,true);assert.equal(d.querySelector('.success-toast'),null);
  } finally {dom.window.close();}
 });
 

@@ -145,6 +145,8 @@ html:has(.modal-backdrop),body:has(.modal-backdrop) { overflow:hidden; }
 .auth-resend p { margin:0 0 10px; font-size:13px; }
 .auth-resend small { display:block; margin-top:10px; line-height:1.7; color:var(--muted); }
 .auth-resend button:disabled { opacity:.65; cursor:wait; }
+.confirmation-copy { font-size:14px; line-height:1.9; margin:24px 0; }
+#confirmation-form .secondary-button { margin-top:16px; }
 .error-toast { grid-template-columns:1fr 32px; border-color:#ad2940; color:#8b1d30; background:#fff0ef; }
 .success-toast { max-width:calc(100vw - 48px); overflow-wrap:anywhere; }
 .auth-modal button:disabled { cursor:wait; opacity:.65; }

@@ -8,6 +8,7 @@ import { supabaseConfig } from './lib/supabase-config.mjs';
 import { validateUpload, validateExternalUrl, MAX_FILE_BYTES } from './upload-validation.mjs';
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
+export const AUTH_CALLBACK_URL = 'https://unfinished-project-eta.vercel.app/auth-complete.html';
 const fail = (status, message) => { throw Object.assign(new Error(message), { status }); };
 export function authErrorMessage(error, registering=false) {
   if(error.status===429)return '操作が集中しています。時間をおいて再試行してください。';
@@ -144,7 +145,7 @@ export function createCloudHandler({config = supabaseConfig(), staticDir = resol
         if (!/^\S+@\S+\.\S+$/.test(email) || password.length<8 || password.length>128) fail(400,'メールと8〜128文字のパスワードを入力してください');
         const auth = authClient(); const registering = path.endsWith('register');
         if (registering && !clean(data.displayName,60)) fail(400,'表示名を入力してください');
-        const response = registering ? await auth.auth.signUp({email,password,options:{data:{displayName:clean(data.displayName,60)}}}) : await auth.auth.signInWithPassword({email,password});
+        const response = registering ? await auth.auth.signUp({email,password,options:{emailRedirectTo:AUTH_CALLBACK_URL,data:{displayName:clean(data.displayName,60)}}}) : await auth.auth.signInWithPassword({email,password});
         if (response.error) fail(response.error.status===429?429:400,authErrorMessage(response.error,registering));
         if (!response.data.session) return json(res,200,{user:null,confirmationRequired:true});
         sessionCookies(res,response.data.session,secure); return json(res,200,{user:await profile(response.data.user)});
@@ -153,7 +154,7 @@ export function createCloudHandler({config = supabaseConfig(), staticDir = resol
         const data = await input(req), email = String(data.email || '').trim();
         if (email.length > 180 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail(400,'正しいメールアドレスを入力してください');
         const auth = authClient().auth;
-        const {error} = path.endsWith('resend') ? await auth.resend({type:'signup',email}) : await auth.resetPasswordForEmail(email);
+        const {error} = path.endsWith('resend') ? await auth.resend({type:'signup',email,options:{emailRedirectTo:AUTH_CALLBACK_URL}}) : await auth.resetPasswordForEmail(email,{redirectTo:AUTH_CALLBACK_URL});
         if (error?.status === 429 || ['over_email_send_rate_limit','over_request_rate_limit'].includes(error?.code)) fail(429,'送信間隔が短すぎるか、送信上限に達しています。時間をおいて再試行してください。');
         // Do not disclose whether the account exists or is already confirmed.
         if (error && !['user_not_found','email_not_found','email_exists','email_already_confirmed'].includes(error.code)) fail(503,'メール送信を受け付けられませんでした。時間をおいて再試行してください。');
