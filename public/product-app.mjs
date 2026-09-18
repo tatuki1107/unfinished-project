@@ -64,7 +64,7 @@ function header() {
 }
 
 function intro() {
-  return `<section class="intro" id="top"><div class="intro-copy-block"><p class="kicker">OPEN CREATIVE PROJECTS</p><h1>続きを、待っている作品。</h1><p class="intro-copy">誰かが途中で置いた物語や音楽、ゲームのアイデア。気になる作品を見つけて、あなたの枝を伸ばそう。</p></div>
+  return `<section class="intro" id="top"><div class="intro-copy-block"><p class="kicker">OPEN CREATIVE PROJECTS</p><h1><span>続きを、</span><span>待っている作品。</span></h1><p class="intro-copy">誰かが途中で置いた物語や音楽、ゲームのアイデア。気になる作品を見つけて、あなたの枝を伸ばそう。</p></div>
   <div id="about" class="intro-art"><img src="/art/hero-collage.png" alt="青空と電線を切り取ったコラージュ"><p class="intro-note">未完成は、誰かのはじまり。</p><p class="intro-art-caption">きっと、どこかでつながっている。</p></div></section>`;
 }
 
