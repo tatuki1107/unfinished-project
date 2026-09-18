@@ -11,7 +11,7 @@ const ROOT = fileURLToPath(new URL('.', import.meta.url));
 const fail = (status, message) => { throw Object.assign(new Error(message), { status }); };
 export function authErrorMessage(error, registering=false) {
   if(error.status===429)return '操作が集中しています。時間をおいて再試行してください。';
-  if(error.code==='email_not_confirmed')return 'このアカウントはメール確認待ちの状態です。確認メールが届かない場合は運営にお問い合わせください。';
+  if(error.code==='email_not_confirmed')return 'このアカウントはメール確認待ちです。確認メールのリンクを開いてください。届かない場合は「新規登録」の「確認メールを再送」から送信できます。';
   if(error.code==='invalid_credentials')return 'メールアドレスまたはパスワードが正しくありません。';
   return registering?'登録できませんでした。入力内容を確認し、時間をおいて再試行してください。':'ログインできませんでした。時間をおいて再試行してください。';
 }
@@ -46,11 +46,11 @@ function sessionCookies(res, session, secure) {
     `sb-refresh=${encodeURIComponent(session?.refresh_token || '')}${attrs}; Max-Age=${session ? 1209600 : 0}`,
   ]);
 }
-export function createCloudHandler({config = supabaseConfig(), staticDir = resolve(ROOT,'dist'), secure = process.env.NODE_ENV === 'production'} = {}) {
+export function createCloudHandler({config = supabaseConfig(), staticDir = resolve(ROOT,'dist'), secure = process.env.NODE_ENV === 'production', clientFactory = createClient} = {}) {
   const options = {auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}};
-  const admin = createClient(config.url, config.secretKey, options);
+  const admin = clientFactory(config.url, config.secretKey, options);
   const storage = admin.storage.from(config.bucket);
-  const authClient = () => createClient(config.url, config.publishableKey, options);
+  const authClient = () => clientFactory(config.url, config.publishableKey, options);
   const one = async (table,id) => uuid(id) ? result(admin.from(table).select('*').eq('id',id).maybeSingle()) : null;
   const project = async (id,user) => { const p = await one('projects',id); if (!canRead(p,user)) fail(404,'作品が見つからないか閲覧できません'); return p; };
   async function profile(authUser) {
@@ -149,8 +149,14 @@ export function createCloudHandler({config = supabaseConfig(), staticDir = resol
         if (!response.data.session) return json(res,200,{user:null,confirmationRequired:true});
         sessionCookies(res,response.data.session,secure); return json(res,200,{user:await profile(response.data.user)});
       }
-      if (path === '/api/auth/recover' && method === 'POST') {
-        const data = await input(req); await authClient().auth.resetPasswordForEmail(clean(data.email,180));
+      if (['/api/auth/recover','/api/auth/resend'].includes(path) && method === 'POST') {
+        const data = await input(req), email = String(data.email || '').trim();
+        if (email.length > 180 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) fail(400,'正しいメールアドレスを入力してください');
+        const auth = authClient().auth;
+        const {error} = path.endsWith('resend') ? await auth.resend({type:'signup',email}) : await auth.resetPasswordForEmail(email);
+        if (error?.status === 429 || ['over_email_send_rate_limit','over_request_rate_limit'].includes(error?.code)) fail(429,'送信間隔が短すぎるか、送信上限に達しています。時間をおいて再試行してください。');
+        // Do not disclose whether the account exists or is already confirmed.
+        if (error && !['user_not_found','email_not_found','email_exists','email_already_confirmed'].includes(error.code)) fail(503,'メール送信を受け付けられませんでした。時間をおいて再試行してください。');
         return json(res,200,{ok:true});
       }
       if (path === '/api/auth/password' && method === 'POST') {

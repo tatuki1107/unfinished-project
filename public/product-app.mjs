@@ -112,7 +112,7 @@ function authModal(mode="login") {
   return `<div class="modal-backdrop"><section class="composer auth-modal" role="dialog" aria-modal="true" aria-label="ログイン"><div class="composer-head"><div><span class="modal-icon"><img src="${icons("users")}" alt=""></span><div><p class="kicker">MEMBER</p><h2>${mode==="register"?"アカウントを作る":"ログイン"}</h2></div></div><button class="close-button" aria-label="閉じる" data-action="close-modal"><img src="${icons("x")}" alt=""></button></div>
   <div class="auth-switch"><button data-action="auth-login" class="${mode==="login"?"active":""}">ログイン</button><button data-action="auth-register" class="${mode==="register"?"active":""}">新規登録</button></div>
   <form id="auth-form" data-mode="${mode}">${mode==="register"?`<label>表示名<input name="displayName" required maxlength="60" autocomplete="nickname"></label>`:""}<label>メール<input type="email" name="email" required autocomplete="email" value=""></label><label>パスワード<input type="password" name="password" minlength="8" maxlength="128" required autocomplete="${mode==="register"?"new-password":"current-password"}" value=""></label><p class="form-error" role="alert" tabindex="-1" hidden></p><button class="primary-button">${mode==="register"?"登録して始める":"ログイン"}</button></form>
-  ${state.backend==='supabase'&&mode==='login'?'<button type="button" class="subtle-button" data-action="recover-password">パスワードを忘れた方</button>':''}</section></div>`;
+  ${state.backend==='supabase'?(mode==='login'?'<button type="button" class="subtle-button" data-action="recover-password">パスワードを忘れた方</button>':'<div class="auth-resend"><p>確認メールが届かない方へ</p><button type="button" class="secondary-button" data-action="resend-confirmation">確認メールを再送</button><small>上のメール欄に登録したアドレスを入力してください。迷惑メールフォルダもご確認ください。</small></div>'):''}</section></div>`;
 }
 
 function projectModal(branch=false,editing=false) {
@@ -183,9 +183,34 @@ function modal() {
   return "";
 }
 
-function render() { const filterScroll=root.querySelector('.filter-scroll')?.scrollLeft||0; root.innerHTML=`<div class="app-shell">${header()}${main()}${state.notice?`<div class="success-toast" role="status"><img src="${icons("check-circle")}" alt=""><div><strong>${esc(state.notice)}</strong></div><button data-action="dismiss-notice"><img src="${icons("x")}" alt=""></button></div>`:""}${modal()}</div>`; const filters=root.querySelector('.filter-scroll'); if(filters) filters.scrollLeft=filterScroll; syncDialog(); }
-function flash(message) { state.notice=message; render(); setTimeout(()=>{ if(state.notice===message){state.notice="";root.querySelector('.success-toast')?.remove();}},3500); }
-function formError(form,message,notice=false) { const box=form?.querySelector('.form-error'); if(!box){flash(message);return;} box.classList.toggle('form-notice',notice);box.setAttribute('role',notice?'status':'alert');box.hidden=false;box.textContent=message;box.tabIndex=-1;box.focus({preventScroll:true});box.scrollIntoView?.({block:'nearest'}); }
+function render() { const filterScroll=root.querySelector('.filter-scroll')?.scrollLeft||0; root.innerHTML=`<div class="app-shell">${header()}${main()}${modal()}</div>`; const filters=root.querySelector('.filter-scroll'); if(filters) filters.scrollLeft=filterScroll; syncDialog(); }
+function flash(message,error=false) {
+ const dialog=root.querySelector('[role=dialog]');
+ if(state.modal&&dialog){formError(dialog,message,!error);return;}
+ if(!error){state.notice='';render();}
+ state.notice=message;root.querySelector('.success-toast')?.remove();
+ const toast=document.createElement('div');toast.className=`success-toast${error?' error-toast':''}`;toast.setAttribute('role',error?'alert':'status');
+ toast.innerHTML=`${error?'':`<img src="${icons('check-circle')}" alt="">`}<div><strong>${esc(message)}</strong></div><button data-action="dismiss-notice" aria-label="通知を閉じる"><img src="${icons('x')}" alt=""></button>`;
+ root.querySelector('.app-shell')?.append(toast);
+ setTimeout(()=>{toast.remove();if(state.notice===message)state.notice='';},error?8000:3500);
+}
+function formError(form,message,notice=false) { let box=form?.querySelector('.form-error'); if(!box&&form){box=document.createElement('p');box.className='form-error';form.append(box);}if(!box){flash(message,!notice);return;} box.classList.toggle('form-notice',notice);box.setAttribute('role',notice?'status':'alert');box.hidden=false;box.textContent=message;box.tabIndex=-1;box.focus({preventScroll:true});box.scrollIntoView?.({block:'nearest'}); }
+const mailCooldowns=new Map();
+function mailCooldown(button,key){
+ const update=()=>{const seconds=Math.ceil(((mailCooldowns.get(key)||0)-Date.now())/1000);button.disabled=seconds>0;button.textContent=seconds>0?`再送まで ${seconds} 秒`:button.dataset.idleLabel;return seconds;};
+ if(update()>0){const timer=setInterval(()=>{if(!button.isConnected||update()<=0)clearInterval(timer);},1000);}
+}
+async function sendAuthMail(button,action){
+ const form=root.querySelector('#auth-form'),field=form?.querySelector('[name=email]');if(!form||form.dataset.saving)return;
+ if(!field.value.trim()||!field.checkValidity()){formError(form,'正しいメールアドレスを入力してから押してください。');return;}
+ const email=field.value.trim(),key=`${action}:${email.toLowerCase()}`;
+ button.dataset.idleLabel ||= button.textContent;
+ if((mailCooldowns.get(key)||0)>Date.now()){mailCooldown(button,key);formError(form,'次の送信まで少しお待ちください。',true);return;}
+ form.dataset.saving='true';form.setAttribute('aria-busy','true');button.disabled=true;button.textContent='送信しています…';
+ try{await api(action==='resend-confirmation'?'/api/auth/resend':'/api/auth/recover',{method:'POST',body:JSON.stringify({email})});mailCooldowns.set(key,Date.now()+60000);formError(form,action==='resend-confirmation'?'確認待ちのアカウントがある場合、確認メールを送信します。メール内のリンクを開いて登録を完了してください。届かない場合は迷惑メールフォルダもご確認ください。':'対象のアカウントがある場合、パスワード再設定メールを送信します。迷惑メールフォルダもご確認ください。',true);}
+ catch(error){formError(form,error.message);}
+ finally{delete form.dataset.saving;form.removeAttribute('aria-busy');mailCooldown(button,key);}
+}
 function needAuth() { if(state.user) return true; state.modal="auth"; render(); return false; }
 
 async function fileValue(file,kind='asset') { if(!file?.name) return null; if(!file.size) throw new Error('空のファイルは登録できません'); if(file.size>6*1024*1024) throw new Error("ファイルは6MiB以下にしてください");
@@ -206,10 +231,10 @@ root.addEventListener("click",async event=>{
     if(button.dataset.projectFromModal){ state.modal=null; state.selectedId=button.dataset.projectFromModal; await loadDetail(); render(); return; }
     if(button.dataset.noticeProject){ state.modal=null; state.selectedId=button.dataset.noticeProject; await loadDetail(); render(); return; }
     const action=button.dataset.action; if(!action) return;
-    if(action==='recover-password'){const email=root.querySelector('#auth-form [name=email]')?.value;if(!email){flash('メールアドレスを入力してから押してください');return;}await api('/api/auth/recover',{method:'POST',body:JSON.stringify({email})});flash('対象のアカウントがある場合、再設定メールを送信します');return;}
+    if(action==='recover-password'||action==='resend-confirmation'){await sendAuthMail(button,action);return;}
     if(action==="focus-search"){ document.querySelector("#project-search")?.focus(); return; }
     if(action==="close-modal"){ state.modal=null; state.returnToBranch=false; render(); return; }
-    if(action==="dismiss-notice"){ state.notice=""; render(); return; }
+    if(action==="dismiss-notice"){ state.notice="";root.querySelector('.success-toast')?.remove();return; }
     if(action==="auth-login"){ state.modal="auth"; render(); return; } if(action==="auth-register"){ state.modal="register"; render(); return; }
     if(action==="account"){ state.modal=state.user?"account":"auth"; render(); return; }
     if(action==="new-project"){ if(needAuth()){state.modal="new";render();} return; }
@@ -226,7 +251,7 @@ root.addEventListener("click",async event=>{
     if(action==="my-projects"){const d=await api("/api/projects?mine=1");state.modal={type:"collection",title:"自分の作品",projects:d.projects};render();return;}
     if(action==="bookmarks-panel"){const d=await api("/api/me/bookmarks");state.modal={type:"collection",title:"ブックマーク",projects:d.projects};render();return;}
     if(action==="admin-reports"){const d=await api("/api/admin/reports");state.modal={type:"admin",reports:d.reports};render();return;}
-  } catch(error){flash(error.message);}
+  } catch(error){flash(error.message,true);}
 });
 
 root.addEventListener("change",async event=>{
@@ -242,7 +267,7 @@ root.addEventListener("change",async event=>{
     } catch(error){formError(form,error.message);} finally{field.value='';} return;
   }
   try { if(event.target.dataset.report){await api(`/api/admin/reports/${event.target.dataset.report}`,{method:"PATCH",body:JSON.stringify({status:event.target.value})});flash("対応状態を更新しました");} }
-  catch(error){flash(error.message);}
+  catch(error){flash(error.message,true);}
 });
 
 root.addEventListener("submit",async event=>{
@@ -258,7 +283,7 @@ root.addEventListener("submit",async event=>{
       try {
         const d=Object.fromEntries(new FormData(form)),mode=form.dataset.mode;
         const result=await api(`/api/auth/${mode}`,{method:"POST",body:JSON.stringify(d)});
-        if(result.confirmationRequired){form.querySelector('[name=password]').value='';formError(form,'確認メールをご確認ください。メール内のリンクを開くと登録が完了します。届かない場合は迷惑メールフォルダもご確認ください。すでに登録済みの方はログインしてください。',true);return;}
+        if(result.confirmationRequired){form.querySelector('[name=password]').value='';const resend=root.querySelector('[data-action=resend-confirmation]');if(resend){const key=`resend-confirmation:${d.email.trim().toLowerCase()}`;resend.dataset.idleLabel='確認メールを再送';mailCooldowns.set(key,Date.now()+60000);mailCooldown(resend,key);}formError(form,'確認メールをご確認ください。メール内のリンクを開くと登録が完了します。届かない場合は迷惑メールフォルダをご確認のうえ、下の「確認メールを再送」をお使いください。すでに登録済みの方はログインしてください。',true);return;}
         state.user=result.user;state.modal=null;
         if(state.returnToBranch){await loadDetail();state.modal='branch';state.returnToBranch=false;render();}
         else{await loadProjects();flash(mode==="register"?"アカウントを作成しました":"ログインしました");}
@@ -287,6 +312,6 @@ setupSortMenu(root, async value => {
   const previous=state.sort;
   state.sort=value;
   try { await loadProjects(); render(); }
-  catch(error) { state.sort=previous; flash(error.message); }
+  catch(error) { state.sort=previous; flash(error.message,true); }
 });
 boot().catch(error=>{ root.innerHTML=`<div class="fatal-state"><img src="/brand/unfinished-project-symbol.png" alt=""><h1>読み込みに失敗しました</h1><p>${esc(error.message)}</p><button onclick="location.reload()">再読み込み</button></div>`; });

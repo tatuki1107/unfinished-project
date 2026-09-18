@@ -139,6 +139,14 @@ html:has(.modal-backdrop),body:has(.modal-backdrop) { overflow:hidden; }
 .auth-modal .form-error { margin:0; line-height:1.7; }
 .auth-modal .form-notice { border-left-color:var(--blue); color:var(--ink); background:#edf4fb; }
 .auth-modal .form-error:focus-visible { outline:2px solid #ad2940; outline-offset:3px; }
+.form-notice { border-left-color:var(--blue); color:var(--ink); background:#edf4fb; }
+.auth-modal .form-notice:focus-visible { outline-color:var(--blue); }
+.auth-resend { margin-top:20px; padding-top:16px; border-top:1px solid var(--line); }
+.auth-resend p { margin:0 0 10px; font-size:13px; }
+.auth-resend small { display:block; margin-top:10px; line-height:1.7; color:var(--muted); }
+.auth-resend button:disabled { opacity:.65; cursor:wait; }
+.error-toast { grid-template-columns:1fr 32px; border-color:#ad2940; color:#8b1d30; background:#fff0ef; }
+.success-toast { max-width:calc(100vw - 48px); overflow-wrap:anywhere; }
 .auth-modal button:disabled { cursor:wait; opacity:.65; }
 .save-button:disabled { opacity:.6; cursor:wait; }
 .nav-link { border:0; padding:0; background:transparent; color:var(--ink); font:700 13px/1.4 "M PLUS Rounded 1c",sans-serif; cursor:pointer; }
