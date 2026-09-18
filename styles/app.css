@@ -137,6 +137,7 @@ html:has(.modal-backdrop),body:has(.modal-backdrop) { overflow:hidden; }
 .form-error { border-left:3px solid #ad2940; padding:12px; color:#8b1d30; background:#fff0ef; font-size:14px; }
 .success-toast { z-index:80; }
 .auth-modal .form-error { margin:0; line-height:1.7; }
+.auth-modal .form-notice { border-left-color:var(--blue); color:var(--ink); background:#edf4fb; }
 .auth-modal .form-error:focus-visible { outline:2px solid #ad2940; outline-offset:3px; }
 .auth-modal button:disabled { cursor:wait; opacity:.65; }
 .save-button:disabled { opacity:.6; cursor:wait; }

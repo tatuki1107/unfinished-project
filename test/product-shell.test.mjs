@@ -3,6 +3,25 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {JSDOM} from 'jsdom';
 
+test('registration confirmation is a notice, keeps email and clears password without signing in',async()=>{
+ const dom=new JSDOM('<div id="product-root"></div>',{url:'http://localhost',runScripts:'outside-only'});
+ dom.window.fetch=async path=>({ok:true,json:async()=>path==='/api/auth/register'?{confirmationRequired:true,user:null}:{user:null,projects:[],backend:'supabase'}});
+ try {
+   const source=readFileSync(new URL('../public/product-app.mjs',import.meta.url),'utf8').replace(/^import .*;\r?\n/gm,'');
+   await dom.window.eval(`(async()=>{const setupSearchSuggestions=()=>{},setupSortMenu=()=>{},sortMenu=()=>'';${source}})()`);
+   await new Promise(r=>setTimeout(r,20));
+   const d=dom.window.document;
+   d.querySelector('[data-action=account]').click();d.querySelector('[data-action=auth-register]').click();
+   const f=d.querySelector('#auth-form');
+   f.querySelector('[name=email]').value='registration-test@example.com';f.querySelector('[name=password]').value='test-password';
+   f.dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));
+   await new Promise(r=>setTimeout(r,20));
+   const notice=f.querySelector('.form-notice');assert.ok(notice);assert.equal(notice.hidden,false);assert.equal(notice.getAttribute('role'),'status');
+   assert.match(notice.textContent,/メール内のリンク/);assert.equal(f.querySelector('[name=password]').value,'');assert.equal(f.querySelector('[name=email]').value,'registration-test@example.com');
+   assert.equal(f.querySelector('button').disabled,false);assert.equal(d.querySelector('.success-toast'),null);
+ } finally {dom.window.close();}
+});
+
 test('auth failure stays inside modal, preserves inputs, prevents duplicates and supports retry',async()=>{
  const dom=new JSDOM('<div id="product-root"></div>',{url:'http://localhost',runScripts:'outside-only'});
  let resolveLogin,calls=0;

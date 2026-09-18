@@ -185,7 +185,7 @@ function modal() {
 
 function render() { const filterScroll=root.querySelector('.filter-scroll')?.scrollLeft||0; root.innerHTML=`<div class="app-shell">${header()}${main()}${state.notice?`<div class="success-toast" role="status"><img src="${icons("check-circle")}" alt=""><div><strong>${esc(state.notice)}</strong></div><button data-action="dismiss-notice"><img src="${icons("x")}" alt=""></button></div>`:""}${modal()}</div>`; const filters=root.querySelector('.filter-scroll'); if(filters) filters.scrollLeft=filterScroll; syncDialog(); }
 function flash(message) { state.notice=message; render(); setTimeout(()=>{ if(state.notice===message){state.notice="";root.querySelector('.success-toast')?.remove();}},3500); }
-function formError(form,message) { const box=form?.querySelector('.form-error'); if(!box){flash(message);return;} box.hidden=false;box.textContent=message;box.tabIndex=-1;box.focus({preventScroll:true});box.scrollIntoView?.({block:'nearest'}); }
+function formError(form,message,notice=false) { const box=form?.querySelector('.form-error'); if(!box){flash(message);return;} box.classList.toggle('form-notice',notice);box.setAttribute('role',notice?'status':'alert');box.hidden=false;box.textContent=message;box.tabIndex=-1;box.focus({preventScroll:true});box.scrollIntoView?.({block:'nearest'}); }
 function needAuth() { if(state.user) return true; state.modal="auth"; render(); return false; }
 
 async function fileValue(file,kind='asset') { if(!file?.name) return null; if(!file.size) throw new Error('空のファイルは登録できません'); if(file.size>6*1024*1024) throw new Error("ファイルは6MiB以下にしてください");
@@ -258,7 +258,7 @@ root.addEventListener("submit",async event=>{
       try {
         const d=Object.fromEntries(new FormData(form)),mode=form.dataset.mode;
         const result=await api(`/api/auth/${mode}`,{method:"POST",body:JSON.stringify(d)});
-        if(result.confirmationRequired){formError(form,'登録は受け付けましたが、現在メール確認が必要な設定です。届かない場合は運営にお問い合わせください。');return;}
+        if(result.confirmationRequired){form.querySelector('[name=password]').value='';formError(form,'確認メールをご確認ください。メール内のリンクを開くと登録が完了します。届かない場合は迷惑メールフォルダもご確認ください。すでに登録済みの方はログインしてください。',true);return;}
         state.user=result.user;state.modal=null;
         if(state.returnToBranch){await loadDetail();state.modal='branch';state.returnToBranch=false;render();}
         else{await loadProjects();flash(mode==="register"?"アカウントを作成しました":"ログインしました");}
