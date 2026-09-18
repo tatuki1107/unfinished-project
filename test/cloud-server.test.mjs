@@ -1,7 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { canRead, canEdit, createCloudHandler } from '../cloud-server.mjs';
+import { canRead, canEdit, createCloudHandler, authErrorMessage } from '../cloud-server.mjs';
+
+test('auth errors mention email confirmation only for that specific failure',()=>{
+  assert.match(authErrorMessage({code:'invalid_credentials'}),/メールアドレスまたはパスワード/);
+  assert.doesNotMatch(authErrorMessage({code:'invalid_credentials'}),/メール確認/);
+  assert.match(authErrorMessage({code:'email_not_confirmed'}),/メール確認待ち/);
+  assert.match(authErrorMessage({status:429}),/時間をおいて/);
+  assert.doesNotMatch(authErrorMessage({message:'private server details'},true),/private server details/);
+});
 
 test('cloud permissions distinguish public, unlisted, draft, owner and admin',()=>{
   const p={author_id:'owner',status:'published',visibility:'public'};

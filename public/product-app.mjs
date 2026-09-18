@@ -111,7 +111,7 @@ function main() {
 function authModal(mode="login") {
   return `<div class="modal-backdrop"><section class="composer auth-modal" role="dialog" aria-modal="true" aria-label="ログイン"><div class="composer-head"><div><span class="modal-icon"><img src="${icons("users")}" alt=""></span><div><p class="kicker">MEMBER</p><h2>${mode==="register"?"アカウントを作る":"ログイン"}</h2></div></div><button class="close-button" aria-label="閉じる" data-action="close-modal"><img src="${icons("x")}" alt=""></button></div>
   <div class="auth-switch"><button data-action="auth-login" class="${mode==="login"?"active":""}">ログイン</button><button data-action="auth-register" class="${mode==="register"?"active":""}">新規登録</button></div>
-  <form id="auth-form" data-mode="${mode}">${mode==="register"?`<label>表示名<input name="displayName" required maxlength="60"></label>`:""}<label>メール<input type="email" name="email" required value=""></label><label>パスワード<input type="password" name="password" minlength="8" required value=""></label><button class="primary-button">${mode==="register"?"登録して始める":"ログイン"}</button></form>
+  <form id="auth-form" data-mode="${mode}">${mode==="register"?`<label>表示名<input name="displayName" required maxlength="60" autocomplete="nickname"></label>`:""}<label>メール<input type="email" name="email" required autocomplete="email" value=""></label><label>パスワード<input type="password" name="password" minlength="8" maxlength="128" required autocomplete="${mode==="register"?"new-password":"current-password"}" value=""></label><p class="form-error" role="alert" tabindex="-1" hidden></p><button class="primary-button">${mode==="register"?"登録して始める":"ログイン"}</button></form>
   ${state.backend==='supabase'&&mode==='login'?'<button type="button" class="subtle-button" data-action="recover-password">パスワードを忘れた方</button>':''}</section></div>`;
 }
 
@@ -185,7 +185,7 @@ function modal() {
 
 function render() { const filterScroll=root.querySelector('.filter-scroll')?.scrollLeft||0; root.innerHTML=`<div class="app-shell">${header()}${main()}${state.notice?`<div class="success-toast" role="status"><img src="${icons("check-circle")}" alt=""><div><strong>${esc(state.notice)}</strong></div><button data-action="dismiss-notice"><img src="${icons("x")}" alt=""></button></div>`:""}${modal()}</div>`; const filters=root.querySelector('.filter-scroll'); if(filters) filters.scrollLeft=filterScroll; syncDialog(); }
 function flash(message) { state.notice=message; render(); setTimeout(()=>{ if(state.notice===message){state.notice="";root.querySelector('.success-toast')?.remove();}},3500); }
-function formError(form,message) { const box=form?.querySelector('.form-error'); if(!box){flash(message);return;} box.hidden=false;box.textContent=message;box.scrollIntoView({block:'nearest'}); }
+function formError(form,message) { const box=form?.querySelector('.form-error'); if(!box){flash(message);return;} box.hidden=false;box.textContent=message;box.tabIndex=-1;box.focus({preventScroll:true});box.scrollIntoView?.({block:'nearest'}); }
 function needAuth() { if(state.user) return true; state.modal="auth"; render(); return false; }
 
 async function fileValue(file,kind='asset') { if(!file?.name) return null; if(!file.size) throw new Error('空のファイルは登録できません'); if(file.size>6*1024*1024) throw new Error("ファイルは6MiB以下にしてください");
@@ -250,7 +250,21 @@ root.addEventListener("submit",async event=>{
   try {
     if(form.id==="search-form"){state.q=new FormData(form).get("q").trim();await loadProjects();render();return;}
     if(form.id==='password-form'){await api('/api/auth/password',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(form)))});state.modal=null;render();flash('パスワードを更新しました');return;}
-    if(form.id==="auth-form"){const d=Object.fromEntries(new FormData(form));const mode=form.dataset.mode;const result=await api(`/api/auth/${mode}`,{method:"POST",body:JSON.stringify(d)});if(result.confirmationRequired){state.modal='auth';render();flash('確認メールを送信しました。メール内のリンクを開いてからログインしてください');return;}state.user=result.user;state.modal=null;if(state.returnToBranch){await loadDetail();state.modal='branch';state.returnToBranch=false;render();}else{await loadProjects();flash(mode==="register"?"アカウントを作成しました":"ログインしました");}return;}
+    if(form.id==="auth-form"){
+      if(form.dataset.saving)return;
+      form.dataset.saving='true';form.setAttribute('aria-busy','true');
+      const submit=form.querySelector('.primary-button'),label=submit.textContent;
+      submit.disabled=true;submit.textContent='確認しています…';form.querySelector('.form-error').hidden=true;
+      try {
+        const d=Object.fromEntries(new FormData(form)),mode=form.dataset.mode;
+        const result=await api(`/api/auth/${mode}`,{method:"POST",body:JSON.stringify(d)});
+        if(result.confirmationRequired){formError(form,'登録は受け付けましたが、現在メール確認が必要な設定です。届かない場合は運営にお問い合わせください。');return;}
+        state.user=result.user;state.modal=null;
+        if(state.returnToBranch){await loadDetail();state.modal='branch';state.returnToBranch=false;render();}
+        else{await loadProjects();flash(mode==="register"?"アカウントを作成しました":"ログインしました");}
+      } finally {delete form.dataset.saving;form.removeAttribute('aria-busy');submit.disabled=false;submit.textContent=label;}
+      return;
+    }
     if(form.id==="project-form"){
       if(form.dataset.saving)return; form.dataset.saving='true'; const save=form.querySelector('.save-button');save.disabled=true;save.textContent='保存しています…';
       try{const payload=await formProject(form);const branch=form.dataset.branch==="true",editing=form.dataset.editing==="true";const url=branch?`/api/projects/${state.selectedId}/branches`:editing?`/api/projects/${state.selectedId}`:"/api/projects";const result=await api(url,{method:editing?"PATCH":"POST",body:JSON.stringify(payload)});state.modal=null;state.category="all";await loadProjects();state.selectedId=result.project.id;await loadDetail();flash(payload.status==='draft'?'下書きを保存しました':payload.visibility==='private'?'非公開で保存しました':payload.visibility==='unlisted'?'限定公開で保存しました':branch?"新しい派生を公開しました":editing?"作品を更新しました":"作品を公開しました");}

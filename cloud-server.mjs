@@ -9,6 +9,12 @@ import { validateUpload, validateExternalUrl, MAX_FILE_BYTES } from './upload-va
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
 const fail = (status, message) => { throw Object.assign(new Error(message), { status }); };
+export function authErrorMessage(error, registering=false) {
+  if(error.status===429)return '操作が集中しています。時間をおいて再試行してください。';
+  if(error.code==='email_not_confirmed')return 'このアカウントはメール確認待ちの状態です。確認メールが届かない場合は運営にお問い合わせください。';
+  if(error.code==='invalid_credentials')return 'メールアドレスまたはパスワードが正しくありません。';
+  return registering?'登録できませんでした。入力内容を確認し、時間をおいて再試行してください。':'ログインできませんでした。時間をおいて再試行してください。';
+}
 const clean = (value, max) => String(value ?? '').trim().slice(0, max);
 const uuid = value => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value || '');
 export const canRead = (p, user) => !!p && (p.status === 'published' && p.visibility !== 'private' || p.author_id === user?.id || user?.role === 'admin');
@@ -139,7 +145,7 @@ export function createCloudHandler({config = supabaseConfig(), staticDir = resol
         const auth = authClient(); const registering = path.endsWith('register');
         if (registering && !clean(data.displayName,60)) fail(400,'表示名を入力してください');
         const response = registering ? await auth.auth.signUp({email,password,options:{data:{displayName:clean(data.displayName,60)}}}) : await auth.auth.signInWithPassword({email,password});
-        if (response.error) fail(response.error.status===429?429:400,registering?'登録できませんでした。メール設定や入力内容を確認し、時間をおいてお試しください':'ログインできませんでした。メール確認と入力内容をご確認ください');
+        if (response.error) fail(response.error.status===429?429:400,authErrorMessage(response.error,registering));
         if (!response.data.session) return json(res,200,{user:null,confirmationRequired:true});
         sessionCookies(res,response.data.session,secure); return json(res,200,{user:await profile(response.data.user)});
       }
