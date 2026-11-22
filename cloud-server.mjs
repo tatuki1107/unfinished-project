@@ -47,10 +47,10 @@ function sessionCookies(res, session, secure) {
     `sb-refresh=${encodeURIComponent(session?.refresh_token || '')}${attrs}; Max-Age=${session ? 1209600 : 0}`,
   ]);
 }
-export function createCloudHandler({config = supabaseConfig(), staticDir = resolve(ROOT,'dist'), secure = process.env.NODE_ENV === 'production', clientFactory = createClient} = {}) {
+export function createCloudHandler({config = supabaseConfig(), staticDir = resolve(ROOT,'dist'), secure = process.env.NODE_ENV === 'production', clientFactory = createClient, database, identity, handleAuth, handleStorage, backend = 'supabase'} = {}) {
   const options = {auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}};
-  const admin = clientFactory(config.url, config.secretKey, options);
-  const storage = admin.storage.from(config.bucket);
+  const admin = database || clientFactory(config.url, config.secretKey, options);
+  const storage = database ? null : admin.storage.from(config.bucket);
   const authClient = () => clientFactory(config.url, config.publishableKey, options);
   const one = async (table,id) => uuid(id) ? result(admin.from(table).select('*').eq('id',id).maybeSingle()) : null;
   const project = async (id,user) => { const p = await one('projects',id); if (!canRead(p,user)) fail(404,'作品が見つからないか閲覧できません'); return p; };
@@ -119,16 +119,18 @@ export function createCloudHandler({config = supabaseConfig(), staticDir = resol
         const expected = `${secure?'https':'http'}://${req.headers.host}`;
         if (req.headers.origin !== expected) fail(403,'不正な送信元です');
       }
-      if (path === '/api/health') return json(res,200,{ok:true,backend:'supabase'});
-      if (path === '/api/config') return json(res,200,{backend:'supabase',storageOrigin:config.url});
+      if (path === '/api/health') { if(database) await database.health(); return json(res,200,{ok:true,backend}); }
+      if (path === '/api/config') return json(res,200,{backend,storageOrigin:config.url});
       if (!path.startsWith('/api/') && !path.startsWith('/uploads/')) {
         let target = resolve(staticDir, '.' + decodeURIComponent(path === '/' ? '/index.html' : path));
         if (!target.startsWith(resolve(staticDir)+sep)) fail(404,'Not found');
         try { if (!(await stat(target)).isFile()) fail(404,'Not found'); } catch { fail(404,'Not found'); }
         res.writeHead(200,{'content-type':mime(target),'cache-control':'no-cache'}); return res.end(method==='HEAD' ? undefined : await readFile(target));
       }
-      const user = await userFrom(req,res);
-      if (path === '/api/session' && method === 'GET') return json(res,200,{user,backend:'supabase'});
+      if (handleAuth && path.startsWith('/api/auth/')) return await handleAuth(req,res,path,method);
+      const user = identity ? await identity(req,res) : await userFrom(req,res);
+      if (path === '/api/session' && method === 'GET') return json(res,200,{user,backend});
+      if (handleStorage && (path.startsWith('/api/uploads/') || path.startsWith('/uploads/'))) return await handleStorage(req,res,path,method,user);
       if (path === '/api/auth/logout' && method === 'POST') {
         const access = cookies(req)['sb-access']; if (access) await admin.auth.admin.signOut(access,'global');
         sessionCookies(res,null,secure); return json(res,200,{ok:true});

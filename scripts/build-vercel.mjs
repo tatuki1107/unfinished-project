@@ -5,10 +5,11 @@ import { supabaseConfig } from '../lib/supabase-config.mjs';
 
 const root=process.cwd(), output=resolve(root,'.vercel/output');
 if(output!==join(root,'.vercel','output'))throw Error('Unexpected build directory');
-const config=supabaseConfig();
+const config=process.env.DATABASE_URL?{url:'https://*.private.blob.vercel-storage.com https://blob.vercel-storage.com'}:supabaseConfig();
 await rm(output,{recursive:true,force:true});
 await mkdir(join(output,'functions/api/index.func'),{recursive:true});
 await cp(resolve(root,'dist'),join(output,'static'),{recursive:true});
+await build({stdin:{contents:"export { put } from '@vercel/blob/client';",resolveDir:root},outfile:join(output,'static/blob-client.mjs'),bundle:true,platform:'browser',format:'esm',minify:true});
 await build({entryPoints:['api/index.mjs'],outfile:join(output,'functions/api/index.func/index.mjs'),bundle:true,platform:'node',format:'esm',target:'node24',
   banner:{js:"import { createRequire as _createRequire } from 'node:module'; const require = _createRequire(import.meta.url);"}});
 await writeFile(join(output,'functions/api/index.func/.vc-config.json'),JSON.stringify({runtime:'nodejs24.x',handler:'index.mjs',launcherType:'Nodejs',maxDuration:60,regions:['hnd1']}));

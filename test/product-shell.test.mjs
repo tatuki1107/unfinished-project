@@ -3,6 +3,27 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {JSDOM} from 'jsdom';
 
+test('Neon registration verifies an email code and then uses the established session',async()=>{
+ const dom=new JSDOM('<div id="product-root"></div>',{url:'http://localhost',runScripts:'outside-only'});
+ let verified=false,submitted;
+ dom.window.fetch=async(path,options)=>({ok:true,json:async()=>{
+  if(path==='/api/auth/register')return{confirmationRequired:true,user:null};
+  if(path==='/api/auth/verify'){submitted=JSON.parse(options.body);verified=true;return{ok:true};}
+  return{user:verified?{id:'qa',email:'qa@example.invalid',displayName:'QA'}:null,projects:[],backend:'neon'};
+ }});
+ try{
+  const source=readFileSync(new URL('../public/product-app.mjs',import.meta.url),'utf8').replace(/^import .*;\r?\n/gm,'');
+  await dom.window.eval(`(async()=>{const setupSearchSuggestions=()=>{},setupSortMenu=()=>{},sortMenu=()=>'';${source}})()`);
+  await new Promise(r=>setTimeout(r,20));const d=dom.window.document;
+  d.querySelector('[data-action=account]').click();d.querySelector('[data-action=auth-register]').click();
+  const form=d.querySelector('#auth-form');form.elements.email.value='qa@example.invalid';form.elements.password.value='test-password';
+  form.dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,20));
+  const confirmation=d.querySelector('#confirmation-form');assert.ok(confirmation.elements.otp);assert.equal(confirmation.querySelector('[name=password]'),null);
+  confirmation.elements.otp.value='123456';confirmation.dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,20));
+  assert.equal(submitted.otp,'123456');assert.equal(submitted.email,'qa@example.invalid');assert.equal(d.querySelector('#confirmation-form'),null);assert.match(d.body.textContent,/メール確認が完了/);
+ }finally{dom.window.close();}
+});
+
 test('registration confirmation is a notice, keeps email and clears password without signing in',async()=>{
  const dom=new JSDOM('<div id="product-root"></div>',{url:'http://localhost',runScripts:'outside-only'});
  dom.window.fetch=async path=>({ok:true,json:async()=>path==='/api/auth/register'?{confirmationRequired:true,user:null}:{user:null,projects:[],backend:'supabase'}});

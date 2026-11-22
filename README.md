@@ -23,7 +23,9 @@ Javelin UIで画面の土台を生成し、作品画面とAPI通信はJavaScript
 | UI基盤 | Javelin UI、JavaからJavaScriptへのコンパイル |
 | 作品画面 | JavaScript ES Modules、独自CSS、Phosphor Icons |
 | 本番API | Node.js、Vercel Functions |
-| 認証・データ・添付 | Supabase Auth、PostgreSQL、private Storage |
+| データベース | Neon PostgreSQL |
+| 認証 | Neon Auth（メール確認コード、HttpOnlyセッション） |
+| 添付ファイル | Vercel Blob（非公開ストア） |
 | ローカル評価版 | Node.js組み込みSQLite |
 
 コンパイラとランタイムを同梱しています。元フレームワークの説明は[こちら](docs/JAVELIN_README.md)。
@@ -41,7 +43,11 @@ http://127.0.0.1:5173/ で開きます。ローカル評価版は `data/` にSQL
 
 ローカル評価用ログイン: `madoka@example.com` / `demo1234`。デモアカウントとDBを本番へ持ち込まないでください。本番モードではデモデータの新規作成を抑止しています。
 
-## Supabase版
+## 本番Neon版
+
+本番はVercel + Neon + 非公開Vercel Blobです。接続設定・初期化・検証方法は[Neon移行手順](docs/neon-migration.md)をご覧ください。以前のSupabaseデータ・アカウントはコピーしていないため、新規登録から利用します。
+
+## 旧Supabase版（ロールバック用）
 
 1. 自分のSupabaseプロジェクトを作成し、`supabase/migrations/202609180001_initial.sql` を新しい環境へ適用します。既存テーブルがある環境へそのまま再実行しないでください。
 2. `.env.example` を `.env.local` にコピーし、自分の接続先・キーを設定します。

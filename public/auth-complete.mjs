@@ -1,11 +1,22 @@
 // Tokens are used once in memory; never persist them in browser storage or logs.
 export async function completeEmailAuth({document,location,history,fetch,redirect=url=>location.replace(url),schedule=setTimeout}) {
  const fragment=new URLSearchParams(location.hash.slice(1));
+ const query=new URLSearchParams(location.search||'');
  const access=fragment.get('access_token'),refresh=fragment.get('refresh_token');
  const recovery=fragment.get('type')==='recovery';
  history.replaceState(null,'',location.pathname);
  const card=document.querySelector('.auth-card'),title=document.querySelector('#auth-title'),message=document.querySelector('#auth-message'),actions=document.querySelector('#auth-actions');
  const fail=copy=>{card.dataset.status='error';card.setAttribute('aria-busy','false');title.textContent='確認を完了できませんでした';message.textContent=copy;message.setAttribute('role','alert');actions.hidden=false;};
+ if(query.get('provider')==='neon') {
+  if(query.has('error')){fail('リンクが無効または期限切れです。新しいメールを再送してください。');return;}
+  if(query.get('type')==='recovery'&&query.get('token')){redirect('/?auth=recovery&token='+encodeURIComponent(query.get('token')));return;}
+  try {
+   const response=await fetch('/api/session',{credentials:'same-origin',cache:'no-store'}),session=await response.json();
+   if(!response.ok||!session.user){fail('メール確認後、ログインしてください。');return;}
+   card.dataset.status='success';card.setAttribute('aria-busy','false');title.textContent='登録が完了しました';message.textContent='ログインしました。作品一覧へ移動します。';schedule(()=>redirect('/'),1600);
+  }catch{fail('通信に失敗しました。ログインをお試しください。');}
+  return;
+ }
  if(fragment.has('error')||!access||!refresh){fail('リンクが期限切れ・使用済み、または確認情報が見つかりません。登録済みの方はログインしてください。確認待ちの方は新しい確認メールを再送できます。');return;}
  try {
   const response=await fetch('/api/auth/session',{method:'POST',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({access_token:access,refresh_token:refresh})});

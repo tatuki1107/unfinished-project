@@ -17,7 +17,10 @@
     "check:java": "node ./bin/check-java.mjs",
     "check:supabase": "node --env-file=.env.local scripts/check-supabase.mjs",
     "serve:cloud": "node --env-file=.env.local cloud-server.mjs",
-    "build:vercel": "npm run build && node --env-file=.env.local scripts/build-vercel.mjs",
+    "build:vercel": "npm run build && node --env-file-if-exists=.env.local scripts/build-vercel.mjs",
+    "serve:neon": "node --env-file=.env.neon.local neon-server.mjs",
+    "check:neon-auth": "node --env-file=.env.neon.local scripts/check-neon-auth.mjs",
+    "check:neon-storage": "node --env-file=.env.neon.local scripts/check-neon-storage.mjs",
     "packages:build": "node ./scripts/build-packages.mjs",
     "packages:check": "npm run packages:build && npm pack --dry-run --workspace @javelin-ui/runtime && npm pack --dry-run --workspace @javelin-ui/cli && npm pack --dry-run --workspace create-javelin-ui",
     "test": "node --test",
@@ -38,10 +41,19 @@
     "source-map": "^0.8.0",
     "tailwindcss": "^4.3.3"
   },
+  "overrides": {
+    "better-auth": "1.7.27",
+    "zod": "4.6.7",
+    "@vercel/oidc": "4.0.9",
+    "source-map-js": "1.2.2"
+  },
   "dependencies": {
     "@fontsource/m-plus-rounded-1c": "^5.3.0",
     "@fontsource/noto-sans-jp": "^5.3.0",
+    "@neondatabase/auth": "0.7.0-beta",
+    "@neondatabase/serverless": "^1.2.1",
     "@phosphor-icons/core": "^2.1.1",
-    "@supabase/supabase-js": "^2.116.0"
+    "@supabase/supabase-js": "^2.116.0",
+    "@vercel/blob": "2.9.0"
   }
 }
